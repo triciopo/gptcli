@@ -1,0 +1,10 @@
+# Python
+src/__pycache__/
+
+# Packaging
+build/
+dist/
+gptcli.egg-info/
+
+# ruff Python linter
+.ruff_cache/
