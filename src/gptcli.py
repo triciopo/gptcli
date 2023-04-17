@@ -6,10 +6,11 @@ This module provides the main logic to
 generate responses to prompts using OpenAI's API.
 """
 
+import signal
 import sys
 import argparse
 import configparser
-import readline
+import readline  # noqa: F401
 import openai
 
 from pathlib import Path
@@ -43,7 +44,7 @@ def post(api_key, prompt, model, num_completions):
         )
         return response
 
-    except openai.error.APIError as error:
+    except (openai.error.APIError, openai.error.InvalidRequestError) as error:
         print(f"{Fore.LIGHTRED_EX}ERROR: {Fore.RESET}{error}")
         sys.exit(1)
     except openai.error.AuthenticationError:
@@ -275,56 +276,51 @@ def chat_mode(api_key, model, num_completions):
 
     # Start chat loop
     while True:
-        try:
-            prompt = input(f"\n{Fore.LIGHTYELLOW_EX}>>> {Fore.RESET} ")
-            print_response(api_key, prompt, model, num_completions)
+        prompt = input(f"\n{Fore.LIGHTYELLOW_EX}>>> {Fore.RESET} ")
+        print_response(api_key, prompt, model, num_completions)
 
-        except KeyboardInterrupt:
-            sys.exit(0)
+
+def signal_handler(signal, frame):
+  """ Exit on CTRL+C without printing errors """
+  print("")
+  sys.exit(0)
 
 
 def main():
     init()  # Initialize Colorama
+    signal.signal(signal.SIGINT, signal_handler)  # Allow CTRL+C without traceback
     # Get arguments and config
     args = arg_parser()
     config = get_config()
 
-    # Get API key from the config
+    # Get api key, model and file extension prompt from the config file.
     api_key = config.get('api', 'api_key')
-
-    # Get model and file extension prompt from the config file.
-    model = config["api"]["model"]
+    model = config.get("api", "model")
     files_prompt = config["file_format_prompt"]
 
     # Get model, number of completions, file and prompt specified on args
-    num_completions = args.num if args.num and args.num >= 1 else 1
+    num_completions = max(args.num, 1) if args.num else 1
     model_name = args.model[0] if args.model else model
     file = args.file[0] if args.file else None
     prompt = " ".join(args.prompt) if args.prompt else None
+    custom_prompt = get_custom(config, args) if has_custom(config, args) else None
 
-    if model_name not in MODELS_LIST:
+    if model_name not in MODELS_LIST:  # gpt-3.5-turbo, gpt-4, gpt-4-32k
         print(f"{Fore.LIGHTRED_EX}ERROR:{Fore.RESET} Invalid model.")
         print(f"Available models: {', '.join(MODELS_LIST)}")
         sys.exit(1)
 
-    custom_prompt = get_custom(config, args)  # prompt from config file
+    if custom_prompt:  # prompt from config file
+        prompt = f"{custom_prompt}{chr(10) + prompt if prompt else ''}"  # chr(10) = \n
 
-    if args.prompt:  # Prompt specified
-        if custom_prompt:
-            prompt = f"{custom_prompt}\n{prompt}"
-        if args.file:  # Prompt and file specified
+    if args.file:  # File specified
+        if not prompt:  # File specified but no prompt
+            prompt = get_prompt_from_file(prompt, file, files_prompt, config, args)
+        else:
             prompt += get_prompt_from_file(prompt, file, files_prompt, config, args)
 
-    elif not args.prompt and not args.file:  # No file or prompt specified
-        if custom_prompt:
-            prompt = custom_prompt
-        else:
-            chat_mode(api_key, model_name, num_completions)
-
-    elif args.file and not args.prompt:  # File specified but no prompt
-        prompt = get_prompt_from_file(None, file, files_prompt, config, args)
-        if custom_prompt:
-            prompt = f"{custom_prompt}\n{prompt}"
+    if not prompt: # no prompt specified
+        chat_mode(api_key, model_name, num_completions)
 
     print_response(api_key, prompt, model_name, num_completions)
 
