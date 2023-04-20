@@ -41,7 +41,7 @@ def post(api_key, prompt, model, num_completions, temperature):
             messages=[{"role": "user", "content": prompt}],
             model=model, temperature=temperature,
             api_key=api_key, n=num_completions,
-            stream=stream, frequence_penalty=0,
+            stream=stream, frequency_penalty=0,
             presence_penalty=0, top_p=1
         )
         return response
