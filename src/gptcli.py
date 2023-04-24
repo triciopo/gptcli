@@ -125,7 +125,7 @@ def get_config():
         None
 
     Returns:
-        configparser.ConfigParser: An instance of the ConfigParser class containing
+        ConfigParser: An instance of the ConfigParser class containing
         the configuration values for gptcli.
     """
     # Get the path to the configuration file and create a new ConfigParser object
@@ -176,7 +176,7 @@ def get_prompt_from_file(prompt, file, file_prompt, config, args):
     if prompt is None:
         prompt = ""
         file_format = Path(file).suffix
-        if has_custom(config, args):
+        if get_pre_prompt(config, args) is not None:
             # Prioritize args instead of file format
             with open(file, "r", encoding="utf-8") as file_content:
                 prompt = f"{file_content.read()}"
@@ -197,38 +197,18 @@ def get_prompt_from_file(prompt, file, file_prompt, config, args):
     return prompt
 
 
-def has_custom(config, args):
+def get_pre_prompt(config, args, prompt = []):
     """
-    Checks whether any custom prompts have been specified on the command line.
-
-    Arguments:
-        config (configparser.ConfigParser): The configuration values for gptcli.
-        args (argparse.Namespace): Instance of the Namespace class containing the args.
-
-    Returns:
-        bool: True if at least one custom prompt has been specified on the command line.
-    """
-    for key in config["args_prompts"]:
-        if key is not None:
-            key_cleaned = "".join(filter(str.isalnum, key)).lower()
-            arg_value = getattr(args, key_cleaned)
-            if arg_value:
-                return True
-    return False
-
-
-def get_custom(config, args):
-    """
-    Returns the custom prompts specified on the command line.
+    Gets prompts from the config based on supplied arguments.
 
     Args:
-        config (configparser.ConfigParser): The configuration values for gptcli.
-        args (argparse.Namespace): Instance of the Namespace class containing the args.
+        config (ConfigParser): The configuration values for gptcli.
+        args (argparse.Namespace): The parsed arguments.
+        prompt (list): The accumulated prompt lines.
 
-    Returns:
-        str: A string containing the custom prompts specified on the command line.
+    Returns: 
+        str: The concatenated prompt lines or None if no prompts were found
     """
-    prompt = []
     if config.has_section("args_prompts"):
         for key in config["args_prompts"]:
             if key is not None:
@@ -236,12 +216,12 @@ def get_custom(config, args):
                 arg_value = getattr(args, key_cleaned)
                 if arg_value:
                     prompt.append(config["args_prompts"][key_cleaned])
-    return '\n'.join(prompt)
+    return '\n'.join(prompt) if len(prompt) > 0 else None
 
 
-def print_response(api_key, prompt, model, num_completions, temperature):
+def stream_output(api_key, prompt, model, num_completions, temperature):
     """
-    Formats and print the output based on number of completions.
+    Formats and prints the output based on number of completions.
 
     Arguments:
         api_key (str): OpenAI API key.
@@ -287,7 +267,7 @@ def chat_mode(api_key, model, num_completions, temperature):
     # Start chat loop
     while True:
         prompt = input(f"\n{Fore.LIGHTYELLOW_EX}>>> {Fore.RESET} ")
-        print_response(api_key, prompt, model, num_completions, temperature)
+        stream_output(api_key, prompt, model, num_completions, temperature)
 
 
 def signal_handler(signal, frame):
@@ -314,26 +294,26 @@ def main():
     model_name = args.model[0] if args.model else model
     file = args.file[0] if args.file else None
     prompt = " ".join(args.prompt) if args.prompt else None
-    custom_prompt = get_custom(config, args) if has_custom(config, args) else None
+    pre_prompt = get_pre_prompt(config, args)
 
     if model_name not in MODELS_LIST:  # gpt-3.5-turbo, gpt-4, gpt-4-32k
         print(f"{Fore.LIGHTRED_EX}ERROR:{Fore.RESET} Invalid model.")
         print(f"Available models: {', '.join(MODELS_LIST)}")
         sys.exit(1)
 
-    if custom_prompt:  # prompt from config file
-        prompt = f"{custom_prompt}{chr(10) + prompt if prompt else ''}"  # chr(10) = \n
+    if pre_prompt is not None:  # prompt from config file
+        prompt = f"{pre_prompt}{chr(10) + prompt if prompt is not None else ''}"
 
-    if file:  # File specified
-        if not prompt:  # File specified but no prompt
+    if file is not None:  # File specified
+        if prompt is None:  # File specified but no prompt
             prompt = get_prompt_from_file(prompt, file, files_prompt, config, args)
         else:
             prompt += get_prompt_from_file(prompt, file, files_prompt, config, args)
 
-    if not prompt: # no prompt specified
+    if prompt is None:  # no prompt specified
         chat_mode(api_key, model_name, num_completions, temperature)
 
-    print_response(api_key, prompt, model_name, num_completions, temperature)
+    stream_output(api_key, prompt, model_name, num_completions, temperature)
 
 
 if __name__ == "__main__":
