@@ -11,9 +11,9 @@ import sys
 import argparse
 import configparser
 import readline  # noqa: F401
+from pathlib import Path
 import openai
 
-from pathlib import Path
 from colorama import init, Fore
 from appdirs import user_config_dir
 
@@ -39,10 +39,14 @@ def post(api_key, prompt, model, num_completions, temperature):
     try:
         response = openai.ChatCompletion.create(
             messages=[{"role": "user", "content": prompt}],
-            model=model, temperature=temperature,
-            api_key=api_key, n=num_completions,
-            stream=stream, frequency_penalty=0,
-            presence_penalty=0, top_p=1
+            model=model,
+            temperature=temperature,
+            api_key=api_key,
+            n=num_completions,
+            stream=stream,
+            frequency_penalty=0,
+            presence_penalty=0,
+            top_p=1,
         )
         return response
 
@@ -110,9 +114,11 @@ def arg_parser():
             cleaned = "".join(filter(str.isalnum, key)).lower()
             key_prompt = config["args_prompts"][key]
             parser.add_argument(
-                f"--{cleaned}", action="store_true",
+                f"--{cleaned}",
+                action="store_true",
                 help=f"Prompt: {key_prompt[:45]} \
-                     {('...' if len(key_prompt) > 45 else '')}")
+                     {('...' if len(key_prompt) > 45 else '')}",
+            )
     return parser.parse_args()
 
 
@@ -136,10 +142,7 @@ def get_config():
 
     # If the configuration file doesn't exist, create it with default values
     if not config_path.is_file():
-        config["api"] = {
-            "api_key": "<INSERT API KEY HERE>",
-            "model": "gpt-3.5-turbo"
-        }
+        config["api"] = {"api_key": "<INSERT API KEY HERE>", "model": "gpt-3.5-turbo"}
         config["file_format_prompt"] = {
             ".txt": "Summarize this for me:",
         }
@@ -188,8 +191,10 @@ def get_prompt_from_file(prompt, file, file_prompt, config, args):
 
         else:
             print("Please specify a prompt when using -f.")
-            print("Alternatively, create a predefined prompt "
-                  "based on the file extension in the config file.")
+            print(
+                "Alternatively, create a predefined prompt "
+                "based on the file extension in the config file."
+            )
             sys.exit(1)
     else:
         with open(file, "r", encoding="utf-8") as file_content:
@@ -197,18 +202,18 @@ def get_prompt_from_file(prompt, file, file_prompt, config, args):
     return prompt
 
 
-def get_pre_prompt(config, args, prompt = []):
+def get_pre_prompt(config, args):
     """
     Gets prompts from the config based on supplied arguments.
 
     Args:
         config (ConfigParser): The configuration values for gptcli.
         args (argparse.Namespace): The parsed arguments.
-        prompt (list): The accumulated prompt lines.
 
-    Returns: 
+    Returns:
         str: The concatenated prompt lines or None if no prompts were found
     """
+    prompt = []
     if config.has_section("args_prompts"):
         for key in config["args_prompts"]:
             if key is not None:
@@ -216,7 +221,7 @@ def get_pre_prompt(config, args, prompt = []):
                 arg_value = getattr(args, key_cleaned)
                 if arg_value:
                     prompt.append(config["args_prompts"][key_cleaned])
-    return '\n'.join(prompt) if len(prompt) > 0 else None
+    return "\n".join(prompt) if len(prompt) > 0 else None
 
 
 def stream_output(api_key, prompt, model, num_completions, temperature):
@@ -238,11 +243,12 @@ def stream_output(api_key, prompt, model, num_completions, temperature):
             if chunk:
                 content = chunk["choices"][0].get("delta", {}).get("content")
                 if content is not None:
-                    print(content, end='', flush=True)
+                    print(content, end="", flush=True)
         print()
     else:
-        choices = post(api_key, prompt, model, num_completions,
-                       temperature).get("choices", [])
+        choices = post(api_key, prompt, model, num_completions, temperature).get(
+            "choices", []
+        )
         output = [c.get("message", {}).get("content", "") for c in choices if c]
         print("\n\n".join(output))
 
@@ -271,7 +277,7 @@ def chat_mode(api_key, model, num_completions, temperature):
 
 
 def signal_handler(signal, frame):
-    """ Exit on CTRL+C without printing errors """
+    """Exit on CTRL+C without printing errors"""
     print("")
     sys.exit(0)
 
@@ -284,7 +290,7 @@ def main():
     config = get_config()
 
     # Get api key, model and file extension prompt from the config file.
-    api_key = config.get('api', 'api_key')
+    api_key = config.get("api", "api_key")
     model = config.get("api", "model")
     files_prompt = config["file_format_prompt"]
 
