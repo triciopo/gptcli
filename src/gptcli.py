@@ -6,16 +6,17 @@ This module provides the main logic to
 generate responses to prompts using OpenAI's API.
 """
 
-import signal
-import sys
 import argparse
 import configparser
+import os
 import readline  # noqa: F401
+import signal
+import sys
 from pathlib import Path
-import openai
 
-from colorama import init, Fore
+import openai
 from appdirs import user_config_dir
+from colorama import Fore, init
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 MODELS_LIST = ["gpt-3.5-turbo", "gpt-4", "gpt-4-32k"]
@@ -289,8 +290,7 @@ def main():
     args = arg_parser()
     config = get_config()
 
-    # Get api key, model and file extension prompt from the config file.
-    api_key = config.get("api", "api_key")
+    # Get model and file extension prompt from the config file.
     model = config.get("api", "model")
     files_prompt = config["file_format_prompt"]
 
@@ -301,6 +301,12 @@ def main():
     file = args.file[0] if args.file else None
     prompt = " ".join(args.prompt) if args.prompt else None
     pre_prompt = get_pre_prompt(config, args)
+
+    # Get api key
+    try:
+        api_key = os.environ["OPENAI_API_KEY"]
+    except KeyError:
+        api_key = config.get("api", "api_key")
 
     if model_name not in MODELS_LIST:  # gpt-3.5-turbo, gpt-4, gpt-4-32k
         print(f"{Fore.LIGHTRED_EX}ERROR:{Fore.RESET} Invalid model.")
