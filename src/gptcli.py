@@ -16,7 +16,7 @@ from pathlib import Path
 
 import openai
 from appdirs import user_config_dir
-from colorama import Fore, init
+from rich import print as rprint
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 MODELS_LIST = ["gpt-3.5-turbo", "gpt-4", "gpt-4-32k"]
@@ -52,10 +52,10 @@ def post(api_key, prompt, model, num_completions, temperature):
         return response
 
     except (openai.error.APIError, openai.error.InvalidRequestError) as error:
-        print(f"{Fore.LIGHTRED_EX}ERROR: {Fore.RESET}{error}")
+        rprint(f"[bold red]ERROR: [/]{error}")
         sys.exit(1)
     except openai.error.AuthenticationError:
-        print(f"{Fore.LIGHTRED_EX}ERROR:{Fore.RESET} Invalid OpenAI API key.")
+        rprint(f"[bold red]ERROR: [/]Invalid OpenAI API key.")
         sys.exit(1)
 
 
@@ -228,13 +228,11 @@ def get_pre_prompt(config, args):
 def stream_output(api_key, prompt, model, num_completions, temperature):
     """
     Formats and prints the output based on number of completions.
-
     Arguments:
         api_key (str): OpenAI API key.
         prompt (str): The main prompt.
         model (str): Name of the model to use.
         num_completions (int): Number of completions to generate.
-
     Returns:
         None
     """
@@ -273,7 +271,7 @@ def chat_mode(api_key, model, num_completions, temperature):
 
     # Start chat loop
     while True:
-        prompt = input(f"\n{Fore.LIGHTYELLOW_EX}>>> {Fore.RESET} ")
+        prompt = input(f"\n>>> ")
         stream_output(api_key, prompt, model, num_completions, temperature)
 
 
@@ -284,7 +282,6 @@ def signal_handler(signal, frame):
 
 
 def main():
-    init()  # Initialize Colorama
     signal.signal(signal.SIGINT, signal_handler)  # Allow CTRL+C without traceback
     # Get arguments and config
     args = arg_parser()
@@ -309,8 +306,8 @@ def main():
         api_key = config.get("api", "api_key")
 
     if model_name not in MODELS_LIST:  # gpt-3.5-turbo, gpt-4, gpt-4-32k
-        print(f"{Fore.LIGHTRED_EX}ERROR:{Fore.RESET} Invalid model.")
-        print(f"Available models: {', '.join(MODELS_LIST)}")
+        rprint(f"[bold red]ERROR: [/]Invalid model.")
+        rprint(f"Available models: {', '.join(MODELS_LIST)}")
         sys.exit(1)
 
     if pre_prompt is not None:  # prompt from config file
