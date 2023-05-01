@@ -16,7 +16,12 @@ from pathlib import Path
 
 import openai
 from appdirs import user_config_dir
+from rich import box
 from rich import print as rprint
+from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 MODELS_LIST = ["gpt-3.5-turbo", "gpt-4", "gpt-4-32k"]
@@ -55,7 +60,7 @@ def post(api_key, prompt, model, num_completions, temperature):
         rprint(f"[bold red]ERROR: [/]{error}")
         sys.exit(1)
     except openai.error.AuthenticationError:
-        rprint(f"[bold red]ERROR: [/]Invalid OpenAI API key.")
+        rprint("[bold red]ERROR: [/]Invalid OpenAI API key.")
         sys.exit(1)
 
 
@@ -228,28 +233,36 @@ def get_pre_prompt(config, args):
 def stream_output(api_key, prompt, model, num_completions, temperature):
     """
     Formats and prints the output based on number of completions.
+
     Arguments:
         api_key (str): OpenAI API key.
         prompt (str): The main prompt.
         model (str): Name of the model to use.
         num_completions (int): Number of completions to generate.
+        temperature (float): What sampling temperature to use.
+
     Returns:
         None
     """
+    console = Console()
+    response = post(api_key, prompt, model, num_completions, temperature)
+
     if num_completions == 1:
-        output = post(api_key, prompt, model, num_completions, temperature)
-        for chunk in output:
-            if chunk:
-                content = chunk["choices"][0].get("delta", {}).get("content")
-                if content is not None:
-                    print(content, end="", flush=True)
-        print()
+        collected = []
+        with Live(console=console, transient=True, refresh_per_second=5) as live:
+            # live.console.print(f"PROMPT: {prompt}")
+            for chunk in response:
+                chunk_message = chunk["choices"][0]["delta"]
+                collected.append(chunk_message)
+                output = "".join([c.get("content", "") for c in collected])
+                markdown = Panel(Markdown(output, code_theme="dracula"))
+                live.update(markdown)
+            console.print(markdown)
     else:
-        choices = post(api_key, prompt, model, num_completions, temperature).get(
-            "choices", []
-        )
-        output = [c.get("message", {}).get("content", "") for c in choices if c]
-        print("\n\n".join(output))
+        message = response.get("choices", [])
+        output = [c.get("message", {}).get("content", "") for c in message if c]
+        markdown = Panel(Markdown("\n\n".join(output), code_theme="dracula"))
+        console.print(markdown)
 
 
 def chat_mode(api_key, model, num_completions, temperature):
@@ -271,7 +284,7 @@ def chat_mode(api_key, model, num_completions, temperature):
 
     # Start chat loop
     while True:
-        prompt = input(f"\n>>> ")
+        prompt = input("\n>>> ")
         stream_output(api_key, prompt, model, num_completions, temperature)
 
 
@@ -306,7 +319,7 @@ def main():
         api_key = config.get("api", "api_key")
 
     if model_name not in MODELS_LIST:  # gpt-3.5-turbo, gpt-4, gpt-4-32k
-        rprint(f"[bold red]ERROR: [/]Invalid model.")
+        rprint("[bold red]ERROR: [/]Invalid model.")
         rprint(f"Available models: {', '.join(MODELS_LIST)}")
         sys.exit(1)
 
