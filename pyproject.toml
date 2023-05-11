@@ -1,0 +1,31 @@
+[project]
+name = "gptcli"
+version = "1.0.0"
+description = "Run OpenAI's ChatGPT from the command-line"
+authors = [
+  { name = "Thiago Riciopo", email = "thiagoriciopo@gmail.com" }
+]
+requires-python= ">=3.10"
+license = {text = "MIT"}
+
+dependencies = [
+    "pyreadline3; sys_platform == 'win32'",
+    "openai",
+    "appdirs",
+    "configparser",
+    "rich",
+    "pathlib",
+]
+
+[project.scripts]
+gptcli = "src.gptcli:main"
+
+[project.urls]
+"Homepage" = "https://github.com/triciopo/gptcli"
+
+[tool.setuptools.packages]
+find = {}
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
